@@ -1,0 +1,368 @@
+#! /usr/bin/env python
+
+# Public Domain (-) 2008-2014 The Wikifactory Authors.
+# See the Wikifactory UNLICENSE file for details.
+
+from cStringIO import StringIO
+from hashlib import sha1
+from inspect import getargspec
+from json import dumps as encode_json, loads as decode_json
+from os import chmod, listdir, mkdir, remove
+from os.path import dirname, exists, isfile, join
+from shutil import rmtree
+from sys import argv, exit, platform, stdout
+from time import sleep
+from urllib import urlopen
+from zipfile import ZipFile
+
+from mako import exceptions
+from mako.lookup import TemplateLookup
+from plumbum import FG, local
+from plumbum.cmd import assetgen
+from yaml import load as load_yaml
+
+# ------------------------------------------------------------------------------
+# Print Utilities
+# ------------------------------------------------------------------------------
+
+def error(msg):
+    print "\033[1;31m!! ERROR: %s !!\033[0m" % msg
+    exit(1)
+
+def start(msg):
+    print "\033[1;34m>> %s\033[0m" % msg
+
+def progress(msg):
+    print "\033[1;30m## %s\033[0m" % msg
+
+def success(msg):
+    print "\033[32m** %s\033[0m" % msg
+
+# ------------------------------------------------------------------------------
+# Platform Detection
+# ------------------------------------------------------------------------------
+
+if platform.startswith('darwin'):
+    PLATFORM = 'darwin'
+elif platform.startswith('linux'):
+    PLATFORM = 'linux'
+elif platform == 'win32':
+    PLATFORM = 'windows'
+else:
+    error("The %r operating system isn't currently supported" % platform)
+
+# ------------------------------------------------------------------------------
+# File Handling
+# ------------------------------------------------------------------------------
+
+def get_yaml_conf(filename):
+    f = open(join(dirname(__file__), filename), 'rb')
+    conf = load_yaml(f)
+    f.close()
+    return conf
+
+def read(filename):
+    f = open(filename, 'rb')
+    data = f.read()
+    f.close()
+    return data
+
+# ------------------------------------------------------------------------------
+# Global Constants
+# ------------------------------------------------------------------------------
+
+META = get_yaml_conf('meta.yaml')
+
+JAVA_SDK_VERSION = META.get('java-sdk-version') or META['gae-version']
+
+GAE_SDK_FILES = {
+    'java': "appengine-java-sdk-%s.zip" % JAVA_SDK_VERSION,
+    'go': "go_appengine_sdk_%s_amd64-%s.zip" % (PLATFORM, META['gae-version']),
+    'python': "google_appengine_%s.zip" % META['gae-version']
+}
+
+GAE_SDK_PATH_ROOT = (
+    "https://commondatastorage.googleapis.com/appengine-sdks/featured/"
+    )
+
+SCRIPT_ROOT = dirname(__file__)
+
+# -----------------------------------------------------------------------------
+# Command Decorator
+# -----------------------------------------------------------------------------
+
+COMMANDS = {}
+
+def register(func):
+    COMMANDS[func.__name__.replace('_', '-')] = (getargspec(func), func)
+
+# ------------------------------------------------------------------------------
+# Utility Functions/Commands
+# ------------------------------------------------------------------------------
+
+def get_path(*path):
+    return join(SCRIPT_ROOT, *path)
+
+appcfg = local[get_path('.appengine_python_sdk', 'appcfg.py')]
+dev_appserver = local[get_path('.appengine_python_sdk', 'dev_appserver.py')]
+
+# ------------------------------------------------------------------------------
+# Download Handlers
+# ------------------------------------------------------------------------------
+
+def download_gae_sdk(runtime):
+
+    name = "%s App Engine SDK" % runtime.title()
+    filename = GAE_SDK_FILES[runtime]
+    target_dir = get_path('.appengine_%s_sdk' % runtime)
+    version_file = join(target_dir, 'VERSION')
+
+    if runtime == 'java':
+        user_dir = join(target_dir, 'lib', 'user')
+        if exists(user_dir):
+            if exists(join(
+                user_dir,
+                'appengine-api-labs-%s.jar' % JAVA_SDK_VERSION
+                )):
+                success("%s is up-to-date." % name)
+                return
+            for subdir in listdir(user_dir):
+                if subdir.startswith('appengine-api-labs-'):
+                    sdk_version = subdir.rsplit('.')[0].split('-')[-1]
+    elif exists(version_file):
+        sdk_version_file = open(version_file, 'rb')
+        sdk_version = sdk_version_file.readline().split()
+        sdk_version = sdk_version and sdk_version[-1] or ''
+        sdk_version_file.close()
+        if sdk_version == '"%s"' % META['gae-version-name']:
+            success("%s is up-to-date." % name)
+            return
+
+    start("Installing %s" % name)
+
+    if exists(target_dir):
+        progress("Removing Existing %s %s" % (name, sdk_version))
+        rmtree(target_dir)
+
+    progress("Downloading %s..." % name)
+
+    try:
+        req = urlopen(GAE_SDK_PATH_ROOT + filename)
+        if runtime == 'go':
+            checksum = META['go-%s-sdk' % PLATFORM]
+        else:
+            checksum = META['%s-sdk' % runtime]
+        sdk_file = validate_download(req, checksum)
+    except Exception, err:
+        error("Couldn't Download the %s: %r" % (name, err))
+
+    progress("Extracting %s" % name)
+    try:
+        mkdir(target_dir, 0777)
+        sdk_zip = ZipFile(sdk_file)
+        for iname in sdk_zip.namelist():
+            newname = iname.split("/", 1)
+            if len(newname) != 2:
+                continue
+            newname = newname[1]
+            if not newname:
+                continue
+            if iname.endswith('/'):
+                mkdir(join(target_dir, newname))
+            else:
+                target_path = join(target_dir, newname)
+                newfile = open(target_path, 'wb')
+                newfile.write(sdk_zip.read(iname))
+                newfile.close()
+                info = sdk_zip.getinfo(iname)
+                if info.external_attr:
+                    chmod(target_path, info.external_attr >> 16)
+    except Exception, err:
+        error("Couldn't Extract the %s: %r" % (name, err))
+
+    success("%s Successfully Installed." % name)
+
+def validate_download(req, checksum):
+    data = req.read()
+    if sha1(data).hexdigest() != checksum:
+        error("Mismatched checksum for downloaded file")
+    return StringIO(data)
+
+# ------------------------------------------------------------------------------
+# Build
+# ------------------------------------------------------------------------------
+
+pregen_template_dir = get_path('pregen')
+
+def build(profile):
+
+    progress("Running assetgen")
+    if profile:
+        with local.cwd(SCRIPT_ROOT):
+            assetgen["assetgen.yaml", "--profile", profile] & FG
+    else:
+        with local.cwd(SCRIPT_ROOT):
+            assetgen["assetgen.yaml"] & FG
+
+    progress("Generating pregen.py")
+
+    assets = decode_json(read(get_path('app', 'assets.json')))
+    lookup = TemplateLookup(
+        directories=[pregen_template_dir],
+        input_encoding='utf-8',
+        output_encoding='utf-8'
+        )
+
+    def get_asset(name):
+        return read(get_path('app', 'build', assets[name]))
+
+    kwargs = {
+        'assets': assets,
+        'encode_json': encode_json,
+        'get_asset': get_asset,
+        'read': read
+        }
+
+    templates = ['# DO NOT EDIT.\n# Auto-generated file.']
+    out = templates.append
+
+    for template in listdir(pregen_template_dir):
+        if template.startswith('_') or not template.endswith('.mako'):
+            continue
+        tmpl = lookup.get_template(template)
+        try:
+            content = repr(tmpl.render(**kwargs)).replace('\\n', '\n')[1:-1]
+            out('%s = """%s"""' % (template[:-5].upper(), content))
+        except Exception:
+            print exceptions.text_error_template().render()
+            exit(1)
+
+    pregen_file = open(get_path('app', 'pregen.py'), 'wb')
+    pregen_file.write('\n\n'.join(templates))
+    pregen_file.close()
+
+# ------------------------------------------------------------------------------
+# Core Tasks
+# ------------------------------------------------------------------------------
+
+@register
+def app(profile='', watch=False):
+    """build the app files"""
+
+    start("Building app files")
+
+    if watch:
+        try:
+            watch = float(watch)
+        except Exception:
+            watch = 1.0
+
+    try:
+        while 1:
+            build(profile)
+            if not watch:
+                break
+            start("Sleeping ...")
+            sleep(watch)
+    except KeyboardInterrupt:
+        stdout.write('\b\b')
+        stdout.flush()
+        exit(0)
+
+    success("App files successfully built")
+
+@register
+def clean():
+    """remove built app files"""
+
+    start("Removing built app files")
+
+    with local.cwd(SCRIPT_ROOT):
+        progress("Running assetgen --clean")
+        assetgen["assetgen.yaml", "--clean"] & FG
+
+    pregen_path = get_path('app', 'pregen.py')
+    if isfile(pregen_path):
+        progress("Removing pregen.py")
+        remove(pregen_path)
+
+    success("Built files successfully removed")
+
+@register
+def deploy(app='all'):
+    """deploy a production build"""
+
+    start("Deploying %s" % app)
+
+    all = 0
+    if app == 'all':
+        all = 1
+
+    if all or app == 'python':
+        progress("Deploying the Python app")
+        with local.cwd(SCRIPT_ROOT):
+            appcfg["update", "app"] & FG
+
+    success("Finished deploying %s" % app)
+
+@register
+def install():
+    """install the various dependencies"""
+
+    for runtime in ('python', 'go', 'java'):
+        download_gae_sdk(runtime)
+
+@register
+def run(profile='dev'):
+    """build and run a local instance"""
+
+    start("Running servers under the %s profile" % profile)
+
+    with local.cwd(SCRIPT_ROOT):
+        dev_appserver["app"] & FG
+
+# -----------------------------------------------------------------------------
+# Script Runner
+# -----------------------------------------------------------------------------
+
+if __name__ == '__main__':
+    argv = argv[1:]
+    if not argv or argv[0] in ('-h', '--help', 'help'):
+        out = []
+        print "Usage: build [command]\n"
+        print "Commands:\n"
+        for cmd in sorted(COMMANDS):
+            spec, func = COMMANDS[cmd]
+            if spec.args:
+                extra = "/%s" % '/'.join("<%s>" % arg for arg in spec.args)
+            else:
+                extra = ""
+            out.append(("%s%s" % (cmd, extra), func.__doc__))
+        max = 0
+        for name, _ in out:
+            spacing = len(name)
+            if spacing > max:
+                max = spacing
+        max += 5
+        for name, doc in out:
+            pad = (max - len(name)) * ' '
+            print "\t%s%s%s" % (name, pad, doc)
+        print
+        exit(0)
+    for cmd in argv:
+        cmd = cmd.split('/', 1)[0]
+        if cmd not in COMMANDS:
+            error("Couldn't find the %s command" % cmd)
+    for cmd in argv:
+        args = cmd.split('/')
+        cmd = args.pop(0)
+        spec, func = COMMANDS[cmd]
+        slen = len(args)
+        req = len(spec.args)
+        if slen > req:
+            error("The %s command only takes %d arguments" % (cmd, req))
+        if spec.defaults:
+            req -= len(spec.defaults)
+        if slen < req:
+            error("The %s command requires at least %d arguments" % (cmd, req))
+        func(*args)
