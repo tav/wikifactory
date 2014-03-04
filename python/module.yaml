@@ -1,0 +1,15 @@
+module: python
+version: 1
+runtime: python27
+api_version: 1
+threadsafe: true
+
+libraries:
+
+- name: webob
+  version: latest
+
+handlers:
+
+- url: .*
+  script: api.app
