@@ -15,12 +15,14 @@ type startEntry struct {
 }
 
 var startDB = []startEntry{
+	// Image types go first as a minor optimisation.
 	{"image/gif", []byte("GIF87a")},
 	{"image/gif", []byte("GIF89a")},
 	{"image/jpeg", []byte("\xff\xd8\xff")},
 	{"image/png", []byte("\x89PNG\r\n\x1a\n")},
-	{"image/tiff", []byte("II\x2a\x00")},
-	{"image/tiff", []byte("MM\x00\x2a")},
+	{"image/tiff", []byte("II*\x00")},
+	{"image/tiff", []byte("MM\x00*")},
+	{"application/pdf", []byte("%PDF")},
 }
 
 type multiEntry struct {
@@ -37,7 +39,7 @@ var multiDB = []multiEntry{
 	{"image/bmp", []sig{
 		{0, []byte("BM")}, {6, []byte("\x00\x00\x00\x00")}}},
 	{"image/webp", []sig{
-		{0, []byte("RIFF")}, {8, []byte("WEBPVP")}}},
+		{0, []byte("RIFF")}, {8, []byte("WEBPVP8")}}},
 }
 
 func Detect(b []byte) string {
