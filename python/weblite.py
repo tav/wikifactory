@@ -70,6 +70,7 @@ VALID_REQUEST_CONTENT_TYPES = frozenset([
 # ------------------------------------------------------------------------------
 
 ERROR_404 = "Not Found"
+ERROR_500 = "Server Error"
 ERROR_500_TRACEBACK = "Server Error: %s"
 ERROR_503 = "Service Unavailable"
 
@@ -109,7 +110,8 @@ class HTTPError(BaseHTTPError):
 
 HANDLER_DEFAULT_CONFIG = {
     'blob': False,
-    'json': False
+    'json': False,
+    'ssl': RUNNING_ON_GOOGLE_SERVERS,
     }
 
 # The ``handle`` decorator is used to turn a function into a handler.
@@ -151,7 +153,6 @@ class Context(object):
     urlunquote = staticmethod(urlunquote)
 
     ajax_request = None
-    json_callback = None
     end_pipeline = None
     site_host = None
 
@@ -375,13 +376,10 @@ def handle_http_request(
         if 'submit' in kwargs:
             del kwargs['submit']
 
-        if 'callback' in kwargs:
-            ctx.json_callback = kwargs.pop('callback')
-
         if env.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest':
             ctx.ajax_request = 1
 
-        if RUNNING_ON_GOOGLE_SERVERS and not ssl_mode:
+        if config['ssl'] and not ssl_mode:
             raise NotFound
 
         # Try and respond with the result of calling the handler.
@@ -453,10 +451,9 @@ def handle_http_request(
     except Exception, error:
         logging.critical(''.join(format_exception(*sys.exc_info())))
         if RUNNING_ON_GOOGLE_SERVERS:
-            traceback = escape("%s: %s" % (error.__class__.__name__, error))
+            response = ERROR_500
         else:
-            traceback = ''.join(html_format_exception())
-        response = ERROR_500_TRACEBACK % traceback
+            response = ERROR_500_TRACEBACK % ''.join(html_format_exception())
         start_response(*RESPONSE_500)
         if isinstance(response, unicode):
             response = response.encode('utf-8')
