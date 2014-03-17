@@ -1,0 +1,11 @@
+--- .appengine_python_sdk/google/appengine/tools/devappserver2/application_configuration.py	2014-02-27 14:31:28.000000000 +0000
++++ .appengine_go_sdk/google/appengine/tools/devappserver2/application_configuration.py	2014-03-17 21:57:37.000000000 +0000
+@@ -577,7 +577,7 @@
+           set(module_name for _, module_name in self.dispatch.dispatch) -
+           module_names)
+       if missing_modules:
+-        raise errors.InvalidAppConfigError(
++        logging.warning(
+             'Modules %s specified in dispatch.yaml are not defined by a yaml '
+             'file.' % sorted(missing_modules))
+ 
