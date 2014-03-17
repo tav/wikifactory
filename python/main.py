@@ -5,6 +5,12 @@ from json import dumps as encode_json
 from secret import APP_ID, TOKEN
 from weblite import app, handle, RUNNING_ON_GOOGLE_SERVERS
 
+from phonenumbers import (
+    parse as parse_number, is_possible_number, is_valid_number, format_number
+    )
+
+from phonenumbers.timezone import time_zones_for_number
+
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import get_lexer_by_name, TextLexer
@@ -63,6 +69,18 @@ def service(param=PARAM_SPLAT):
 # -----------------------------------------------------------------------------
 # Services
 # -----------------------------------------------------------------------------
+
+@service()
+def phonenumber_info(ctx, number, region=None):
+    num = parse_number(number, region)
+    return {
+        'country_code': num.country_code,
+        'e164': format_number(num, 0),
+        'is_possible': is_possible_number(num),
+        'is_valid': is_valid_number(num),
+        'national_number': num.national_number,
+        'timezones': time_zones_for_number(num),
+    }
 
 @service()
 def syntax_highlight(ctx, text, lang=None):
