@@ -15,18 +15,18 @@ from tavutil.crypto import secure_string_comparison
 # Globals
 # -----------------------------------------------------------------------------
 
-APIS = {}
+SERVICES = {}
 
 PARAM_NONE = 0
 PARAM_SINGLE = 1
 PARAM_SPLAT = 2
 
 # -----------------------------------------------------------------------------
-# API Handler
+# Service Handler
 # -----------------------------------------------------------------------------
 
-@handle('api', json='data')
-def api_handler(ctx, method, token, data):
+@handle('service', json='data')
+def service_handler(ctx, method, token, data):
     # Check that the X-Appengine-Inbound-Appid header matches.
     if RUNNING_ON_GOOGLE_SERVERS:
         if ctx.environ.get('HTTP_X_APPENGINE_INBOUND_APPID') != APP_ID:
@@ -36,7 +36,7 @@ def api_handler(ctx, method, token, data):
         raise ctx.NotFound
     ctx.response_headers['Content-Type'] = 'application/json'
     try:
-        handler, param = APIS[method]
+        handler, param = SERVICES[method]
         if param == PARAM_SPLAT:
             reply = handler(ctx, **data)
         elif param == PARAM_SINGLE:
@@ -50,21 +50,21 @@ def api_handler(ctx, method, token, data):
             })
 
 # -----------------------------------------------------------------------------
-# API Decorator
+# Service Decorator
 # -----------------------------------------------------------------------------
 
-def api(param=PARAM_SPLAT):
+def service(param=PARAM_SPLAT):
     def __register(handler):
         name = handler.__name__.replace('_', '.')
-        APIS[name] = (handler, param)
+        SERVICES[name] = (handler, param)
         return handler
     return __register
 
 # -----------------------------------------------------------------------------
-# API Methods
+# Services
 # -----------------------------------------------------------------------------
 
-@api()
+@service()
 def syntax_highlight(ctx, text, lang=None):
     if lang:
         try:
