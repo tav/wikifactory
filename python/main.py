@@ -32,7 +32,7 @@ PARAM_SPLAT = 2
 # -----------------------------------------------------------------------------
 
 @handle('service', json='data')
-def service_handler(ctx, method, token, data):
+def service_handler(ctx, method=None, token='', data=None, **kwargs):
     # Check that the X-Appengine-Inbound-Appid header matches.
     if RUNNING_ON_GOOGLE_SERVERS:
         if ctx.environ.get('HTTP_X_APPENGINE_INBOUND_APPID') != APP_ID:
@@ -44,11 +44,13 @@ def service_handler(ctx, method, token, data):
     try:
         handler, param = SERVICES[method]
         if param == PARAM_SPLAT:
-            reply = handler(ctx, **data)
+            if not isinstance(data, dict):
+                data = {}
+            reply = handler(**data)
         elif param == PARAM_SINGLE:
-            reply = handler(ctx, data)
+            reply = handler(data)
         else:
-            reply = handler(ctx)
+            reply = handler()
         return encode_json({'reply': reply})
     except Exception, err:
         return encode_json({'error':
@@ -71,7 +73,7 @@ def service(param=PARAM_SPLAT):
 # -----------------------------------------------------------------------------
 
 @service()
-def phonenumber_info(ctx, number, region=None):
+def phonenumber_info(number, region=None):
     num = parse_number(number, region)
     return {
         'country_code': num.country_code,
@@ -83,7 +85,7 @@ def phonenumber_info(ctx, number, region=None):
     }
 
 @service()
-def syntax_highlight(ctx, text, lang=None):
+def syntax_highlight(text, lang=None):
     if lang:
         try:
             lexer = get_lexer_by_name(lang)
