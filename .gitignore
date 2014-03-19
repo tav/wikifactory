@@ -4,20 +4,17 @@
 .appengine_java_sdk
 .appengine_python_sdk
 
+app/assets.json
+app/build
+app/config/pregen.go
+app/pregen/pregen.go
 backend/config/pregen.go
-frontend/assets.json
-frontend/build
-frontend/config/pregen.go
-frontend/pregen/pregen.go
 genlogo/logo/fonts.go
-
+instance
+java/war
 live-server/live-server
 live-server/log
 live-server/run
-
-dist
-etc
-private
 
 # hidden files/directories
 
