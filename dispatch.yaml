@@ -1,0 +1,31 @@
+# Public Domain (-) 2014 The Wikifactory Authors.
+# See the Wikifactory UNLICENSE file for details.
+
+dispatch:
+
+- url: "*/files/*"
+  module: files
+
+- url: "*/logo"
+  module: genlogo
+
+- url: "*/logo/*"
+  module: genlogo
+
+- url: "*/process/*"
+  module: backend
+
+- url: "*/proxy/*"
+  module: files
+
+- url: "*/task/*"
+  module: backend
+
+- url: "*/service/coffee2js/*"
+  module: java
+
+- url: "*/service/phonenumber.info/*"
+  module: python
+
+- url: "*/service/syntax.highlight/*"
+  module: python
