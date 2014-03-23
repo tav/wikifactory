@@ -3,14 +3,16 @@
 
 define 'µ', (µ, root) ->
 
+  captureStackTrace = Error.captureStackTrace
+
   newError = (name, defaultMessage) ->
     Exception = (message) ->
       if !(@ instanceof Exception)
         return new Exception(message)
       @name = name
       @message = if typeof message is 'string' then message else defaultMessage
-      if Error.captureStackTrace
-        Error.captureStackTrace @, @constructor
+      if captureStackTrace
+        captureStackTrace @, Exception
       return
     Exception:: = Object.create Error::,
       constructor:
@@ -19,7 +21,7 @@ define 'µ', (µ, root) ->
 
   µ.newError = newError
 
-  µ.AbortError = newError 'AbortError', 'operation was aborted'
-  µ.TimeoutError = newError 'TimeoutError', 'timeout error'
+  µ.Abort = newError 'Abort', 'operation was aborted'
+  µ.Timeout = newError 'Timeout', 'timeout error'
 
   return
