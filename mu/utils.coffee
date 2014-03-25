@@ -11,8 +11,8 @@ define 'µ', (µ, root) ->
   µ.isError = (err) ->
     err instanceof Error
 
-  µ.isFunction = (f) ->
-    typeof f is 'function'
+  µ.isFn = (fn) ->
+    typeof fn is 'function'
 
   µ.keys = keys = root.Object.keys
 
@@ -29,10 +29,11 @@ define 'µ', (µ, root) ->
     return
 
   LRU = (n) ->
-    @length = 0
-    @_d = {}
-    @_n = n
-    @_m = n * 2
+    me = @
+    me.length = 0
+    me._d = {}
+    me._n = n
+    me._m = n * 2
     return
 
   LRU:: =
@@ -44,29 +45,34 @@ define 'µ', (µ, root) ->
       return state[1]
 
     set: (key, value) ->
-      if @not(key)
-        @length++
-      @_d[key] = [last++, value]
-      if @length < @_m
+      me = @
+      if me.not(key)
+        me.length++
+      me._d[key] = [last++, value]
+      if me.length < me._m
         return
-      evict @
+      evict me
       return
 
     delete: (key) ->
-      if @not(key)
+      me = @
+      if me.not(key)
         return
-      delete @_d[key]
-      @length--
+      delete me._d[key]
+      me.length--
       return
 
     not: (key) ->
       @_d[key] is undefined
 
+    toString: ->
+      '[object LRU]'
+
   lru = (limit) ->
     if (limit = limit|0) > 0
       new LRU(limit)
     else
-      throw new µ.ValueError("invalid lru limit value")
+      throw new µ.ValueError("invalid lru limit parameter")
 
   lru._typ = LRU
   µ.lru = lru
@@ -79,10 +85,12 @@ define 'µ', (µ, root) ->
       perf.now()
   else
     latest = now()
+    skew = 0
     µ.clock = ->
       v = now()
-      if v >= latest
-        return latest = v
-      ++latest
+      if v < latest
+        skew += latest - v + 1
+      latest = v
+      return v + skew
 
   return
