@@ -3,16 +3,18 @@
 
 define 'µ', (µ, root) ->
 
-  captureStackTrace = Error.captureStackTrace
+  {Error, Object} = root
+  {captureStackTrace} = Error
 
   newError = (name, defaultMessage) ->
     Exception = (message) ->
-      if !(@ instanceof Exception)
+      err = @
+      if !(err instanceof Exception)
         return new Exception(message)
-      @name = name
-      @message = if typeof message is 'string' then message else defaultMessage
+      err.name = name
+      err.message = if typeof message is 'string' then message else defaultMessage
       if captureStackTrace
-        captureStackTrace @, Exception
+        captureStackTrace err, Exception
       return
     Exception:: = Object.create Error::,
       constructor:
@@ -21,10 +23,14 @@ define 'µ', (µ, root) ->
 
   µ.newError = newError
 
-  µ.Abort = newError 'Abort', 'operation was aborted'
-  µ.KeyError = newError 'KeyError', 'key not found'
-  µ.Timeout = newError 'Timeout', 'timeout error'
-  µ.ValueError = newError 'ValueError', 'invalid value'
+  defError = (name, defaultMessage) ->
+    µ[name] = newError name, defaultMessage
+    return
+
+  defError 'Abort', 'operation was aborted'
+  defError 'KeyError', 'key not found'
+  defError 'Timeout', 'timeout error'
+  defError 'ValueError', 'invalid value'
 
   tryError =
     e: {}
@@ -36,7 +42,7 @@ define 'µ', (µ, root) ->
     # See https://github.com/jashkenas/coffee-script/issues/3434 for more info.
     `try {
         return fn();
-    } catch _err {
+    } catch (_err) {
         tryError.e = _err;
         return tryError;
     }`
@@ -45,7 +51,7 @@ define 'µ', (µ, root) ->
   tryFn1 = (fn, arg) ->
     `try {
         return fn(arg);
-    } catch _err {
+    } catch (_err) {
         tryError.e = _err;
         return tryError;
     }`
@@ -54,7 +60,7 @@ define 'µ', (µ, root) ->
   tryFn2 = (fn, arg1, arg2) ->
     `try {
         return fn(arg1, arg2);
-    } catch _err {
+    } catch (_err) {
         tryError.e = _err;
         return tryError;
     }`
@@ -63,7 +69,7 @@ define 'µ', (µ, root) ->
   tryMeth = (obj, meth) ->
     `try {
         return meth.call(obj);
-    } catch _err {
+    } catch (_err) {
         tryError.e = _err;
         return tryError;
     }`
@@ -72,7 +78,7 @@ define 'µ', (µ, root) ->
   tryMeth1 = (obj, meth, arg) ->
     `try {
         return meth.call(obj, arg);
-    } catch _err {
+    } catch (_err) {
         tryError.e = _err;
         return tryError;
     }`
@@ -81,7 +87,7 @@ define 'µ', (µ, root) ->
   tryMeth2 = (obj, meth, arg1, arg2) ->
     `try {
         return meth.call(obj, arg1, arg2);
-    } catch _err {
+    } catch (_err) {
         tryError.e = _err;
         return tryError;
     }`
