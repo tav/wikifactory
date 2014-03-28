@@ -3,23 +3,10 @@
 
 define 'µ', (µ, root) ->
 
+  {keys, now} = µ._
+
   µ.is = (obj, ctor) ->
     obj instanceof ctor._typ
-
-  µ._ = _ = {}
-
-  _.noop = noop = ->
-    return
-
-  _.isArray = root.Array.isArray
-
-  _.isError = (err) ->
-    err instanceof Error
-
-  _.isFn = isFn = (fn) ->
-    typeof fn is 'function'
-
-  _.keys = keys = root.Object.keys
 
   last = 0
   evict = (lru) ->
@@ -82,33 +69,20 @@ define 'µ', (µ, root) ->
   lru._typ = LRU
   µ.lru = lru
 
-  µ.now = now = root.Date.now
-
   perf = root.performance
   if perf and perf.now
-    µ.clock = ->
+    clock = ->
       perf.now()
   else
     latest = now()
     skew = 0
-    µ.clock = ->
+    clock = ->
       v = now()
       if v < latest
         skew += latest - v + 1
       latest = v
       return v + skew
 
-  console = root.console
-  if typeof console is 'object'
-    if not isFn console.log
-      console.log = noop
-    if not isFn console.error
-      console.error = console.log
-  else
-    console =
-      log: noop
-      error: noop
-
-  _.console = console
+  µ.clock = clock
 
   return
