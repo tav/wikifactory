@@ -6,15 +6,20 @@ define 'µ', (µ, root) ->
   µ.is = (obj, ctor) ->
     obj instanceof ctor._typ
 
-  µ.isArray = root.Array.isArray
+  µ._ = _ = {}
 
-  µ.isError = (err) ->
+  _.noop = noop = ->
+    return
+
+  _.isArray = root.Array.isArray
+
+  _.isError = (err) ->
     err instanceof Error
 
-  µ.isFn = (fn) ->
+  _.isFn = isFn = (fn) ->
     typeof fn is 'function'
 
-  µ.keys = keys = root.Object.keys
+  _.keys = keys = root.Object.keys
 
   last = 0
   evict = (lru) ->
@@ -92,5 +97,18 @@ define 'µ', (µ, root) ->
         skew += latest - v + 1
       latest = v
       return v + skew
+
+  console = root.console
+  if typeof console is 'object'
+    if not isFn console.log
+      console.log = noop
+    if not isFn console.error
+      console.error = console.log
+  else
+    console =
+      log: noop
+      error: noop
+
+  _.console = console
 
   return
