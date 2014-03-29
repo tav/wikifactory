@@ -12,22 +12,24 @@ define 'µ', (µ, root) ->
   # Source:
   # http://codeforhire.com/2013/09/21/setimmediate-and-messagechannel-broken-on-internet-explorer-10/
 
-  queue = []
-  nextQueue = []
-  useNext = false
+  queueA = []
+  queueB = []
+  useA = true
 
   # TODO(tav): Ensure that callbacks don't throw any errors.
-  execTick = ->
-    if useNext
-      useNext = false
-      for callback in nextQueue
-        callback()
-      nextQueue.length = 0
+  run = (queue) ->
+    for callback in queue
+      callback()
+    queue.length = 0
+    return
+
+  tick = ->
+    if useA
+      useA = false
+      run queueA
     else
-      useNext = true
-      for callback in queue
-        callback()
-      queue.length = 0
+      useA = true
+      run queueB
     return
 
   MutationObserver = root.MutationObserver or root.WebKitMutationObserver
@@ -35,25 +37,23 @@ define 'µ', (µ, root) ->
 
   if MutationObserver
     $div = root.document.createElement 'div'
-    observer = new MutationObserver execTick
+    observer = new MutationObserver tick
     observer.observe $div, attributes: true
-    tick = ->
+    scheduleTick = ->
       $div.setAttribute 'class', 'tick'
       return
   else
-    tick = ->
-      setTimeout execTick, 0
+    scheduleTick = ->
+      setTimeout tick, 0
       return
 
-  µ.asap = (callback) ->
-    if useNext
-      if nextQueue.push(callback) is 1
-        tick()
+  µ.schedule = (callback) ->
+    if useA
+      if queueA.push(callback) is 1
+        scheduleTick()
     else
-      if queue.push(callback) is 1
-        tick()
+      if queueB.push(callback) is 1
+        scheduleTick()
     return
-
-  µ.setTimeout = setTimeout
 
   return
