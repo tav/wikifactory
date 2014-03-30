@@ -3,205 +3,255 @@
 
 define 'µ', (µ, root) ->
 
-  ABORTABLE = 0
+  # The bit positions specify:
+  #
+  #   0    whether the flow has state
+  #   1    whether the flow is mutable
+  #   2    whether the flow is buffered
+  #   3    whether the flow is stopable
 
-  _try = µ.try
-  tryError = _try.error
-  tryFn = _try.fn
+  NO_STATE = 0
+  MUTABLE = 2
+  IMMUTABLE = 3
+  BUFFERED = 4
+  STOPABLE = 8
+
+  µ.NO_STATE = NO_STATE
+  µ.MUTABLE = MUTABLE
+  µ.IMMUTABLE = IMMUTABLE
+  µ.BUFFERED = BUFFERED
+
+  {console, keys, tryErr, tryFn, tryFn1} = µ._
+  {StopFlow, now, schedule} = µ
+  {clearInterval, clearTimeout, setInterval, setTimeout} = root
 
   Flow = ->
-    @_b = 0
     return
 
   isFlow = (f) ->
     f instanceof Flow
 
-  isAbortable = (f) ->
-    (f._b & ABORTABLE) > 0
+  isStopable = (f) ->
+    (f._b & STOPABLE) > 0
 
-  setAbortable = (f) ->
-    f._b |= ABORTABLE
-    return f
+  setStopable = (f) ->
+    f._b |= STOPABLE
+    return
 
-  clearTimeout = root.clearTimeout
-  setTimeout = root.setTimeout
+  copyFlags = (upstream, downstream) ->
+    return downstream
+
+  pushValue = (upstream, downstream, value, success, successHandler, failureHandler) ->
+    if success
+      if successHandler is undefined
+        schedule putValue, downstream, value
+      else
+        schedule runHandler, successHandler, downstream, value
+    else
+      if failureHandler is undefined
+        schedule putError, downstream, error
+      else
+        schedule runHandler, failureHandler, downstream, value
+    return
+
+  putError = (flow, error) ->
+    flow.putError error
+    return
+
+  putValue = (flow, value) ->
+    flow.putValue value
+    return
+
+  runHandler = (handler, flow, value) ->
+    ret = tryFn1 failureHandler, value
+    if ret is tryErr
+      downstream.putError ret.e
+    else
+      downstream.putValue ret
+    return
 
   Flow:: =
 
-    _b: 0            # bit flags
-    _p: undefined    # parent
-    _v: undefined    # stored value
-
-    # reject
-    error: (reason) ->
-      return
-
-    then: (handler) ->
-      @
+    _b: 0            # bit field
+    _h: undefined    # handler
+    _f: undefined    # flow subscriber
+    _p: undefined    # parent flow
+    _v: undefined    # value
 
     catch: (handler) ->
+      # @_s.push
       return
-
-    log: ->
-      @then (value) ->
-        console.log value
-        return
-      .catch (reason) ->
-        console.error reason
-        return
 
     catchError: (error, handler) ->
       if not ((error:: instanceof Error) or (error is Error))
         throw new TypeError("catchError can only catch Error and its subclasses")
       return
 
-    finally: (handler)->
+    debounce: (wait, immediate) ->
       return
-
-    # try: (fn) ->
-    #   f = @
-    #   resp = tryFn fn
-    #   if resp is tryError
-    #     f.reject resp.e
-    #   else
-    #     f.resolve resp
-    #   return f
-
-    buffer: ->
-      return
-
-    # set
-    update: (value) ->
-      return
-
-    push: ->
-      return
-
-    resolve: (value) ->
-      return
-
-    # bufferN = ->
-    #   return
 
     filter: (pred) ->
       @then (value) ->
         if pred value
           return value
 
+    finally: (handler)->
+      return
+
+    limit: (duration) ->
+      buf = []
+      last = 0
+      f = new Flow
+      @then (value) ->
+        n = now()
+        setTimeout ->
+          f.set value
+        , duration
+        return
+      return f
+
+    log: ->
+      @then (value) ->
+        console.log value
+        return value
+      .catch (err) ->
+        console.error err
+        throw err
+
+    onStop: (handler) ->
+      f = @
+      setStopable f
+      f.catchError StopFlow, handler
+
+    putError: (err) ->
+      return
+
+    putValue: (value) ->
+      return
+
     reduce: () ->
       return
 
-    # merge: (other) ->
-    #   return
-
-    debounce: (wait, immediate) ->
+    stop: ->
+      f = @
+      while f._a isnt undefined
+        f = f._a
+      f.reject(new StopFlow)
       return
+
+    then: (handler) ->
+      upstream = @
+      downstream = new Flow
+      downstream._b = 0
+      # copy flags ...
+      if isImmutable upstream
+        setImmutable downstream
+      if isStopable upstream
+        setStopable downstream
+        downstream._p = upstream
+      if hasValue upstream
+        pushValue upstream, downstream, upstream._value, handler, undefined
+        if isMutable upstream
+          # me._subscribers.extend([f, handler])
+      else
+        # me._subscribers.extend([f, handler])
+      return downstream
 
     throttle: (wait) ->
       return
 
-    toString: ->
-      '[object Flow]'
-
-    abort: ->
-      f = @
-      while f._a isnt undefined
-        f = f._a
-      f.reject(new µ.Abort)
-      return
-
-    abortable: ->
-      setAbortable @
-
-    sleep: (duration) ->
-      @then (value) ->
-        f = new Flow
-        setTimeout ->
-          f.set value
-        , duration
-        return f
-
     timeout: (wait) ->
       f = @
       setTimeout ->
-        f.reject new µ.Timeout
+        f.setError new µ.Timeout
+        return
       , duration
-      return
+      return f
 
-  newFlow = (spec) ->
-    new Flow
-    return
+    to: (other) ->
+      @.then (value) ->
+        other.setValue value
+        return
+      return other
 
-  newPromise = ->
-    new Flow
+    toString: ->
+      '[object Flow]'
 
-  newStream = ->
-    new Flow
+  newFlow = (flags) ->
+    f = new Flow
+    f._b = flags|0
+    return f
 
-  newValue = (obj) ->
-    v = new Flow
-    if obj is undefined
-      return v
-    v.set obj
-    return v
+  newPromise = (value) ->
+    f = new Flow
+    f._b = IMMUTABLE
+    if value isnt undefined
+      f.setValue value
+    return f
 
-  newFlow._typ = newPromise._typ = newStream._typ = newValue._typ = Flow
+  newValue = (value) ->
+    f = new Flow
+    f._b = MUTABLE
+    if value isnt undefined
+      f.setValue value
+    return f
 
-  console = root.console
+  newFlow._typ = Flow
   newFlow.unhandled = (flow, reason) ->
-    if typeof console is 'object'
-      msg = "Uncaught #{reason}"
-      if typeof console.error is 'function'
-        console.error msg
-      else if typeof console.log is 'function'
-        console.log msg
+    console.error "Uncaught flow error: #{reason}"
     return
 
   µ.flow = newFlow
   µ.promise = newPromise
-  µ.stream = newStream
   µ.value = newValue
 
-  # Returns a value-like flow.
-  all = (flows) ->
-    return
+  µ.every = (duration) ->
+    s = newFlow NO_STATE
+    i = 0
+    timer = setInterval ->
+      s.setValue i++
+      return
+    , duration
+    s.onClose ->
+      clearInterval timer
+      return
 
+  µ.merge = (flows...) ->
+    f = newFlow BUFFERED
+    buffer = (value) ->
+      f.setValue
+      return
+    for flow in flows
+      if isFlow flow
+        flow.then buffer
+      else
+        f.setValue flow
+    return f
+
+  # Returns a value-like flow.
   sync = (flows...) ->
-    return all(flows)
-
-  sync.all = all
-
-  # Returns a stream-like flow.
-  sync.any = (flows) ->
-    return anyN 1, flows
+    return flow
 
   # Returns a value-like flow.
-  sync.anyN = (n, flows) ->
-    return
-
-  # Returns a value-like flow.
-  sync.object = (obj) ->
-    return
-
-  # Returns a promise-like flow.
-  sync.first = (flows) ->
-    return
-
-  # Returns a value-like flow.
-  sync.when = (flows) ->
-    return
+  sync.object = (spec) ->
+    specKeys = keys spec
+    specValues = []
+    l = keys.length
+    `for (var i = 0; i < l; i++) {
+      values[i] = obj[specKeys[i]];
+    }`
+    return sync(values).then ->
+      obj = {}
+      args = [];
+      `for (var i = 0; i < l; i++) {
+        obj[specKeys[i]] = arguments[i];
+      }`
+      return obj
 
   µ.sync = sync
 
-  # µ.constant
-  # µ.channel (backpressure)
-
-  µ.every = (duration) ->
-    return
-
-  # µ.merge
-
-  # µ.map = (seq) ->
+  # Returns a promise-like flow.
+  # sync.first = (flows) ->
   #   return
 
   return
