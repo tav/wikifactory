@@ -12,24 +12,18 @@ define 'µ', (µ, root) ->
   # Source:
   # http://codeforhire.com/2013/09/21/setimmediate-and-messagechannel-broken-on-internet-explorer-10/
 
-  queueA = []
-  queueB = []
-  useA = true
+  _ = µ._
+  _.tickID = 0
+
+  queue = new µ.Queue(25000 * 3)
+  queued = false
 
   # TODO(tav): Ensure that callbacks don't throw any errors.
-  run = (queue) ->
-    for callback in queue
-      callback()
-    queue.length = 0
-    return
-
   tick = ->
-    if useA
-      useA = false
-      run queueA
-    else
-      useA = true
-      run queueB
+    _.tickID++
+    while queue.length() > 0
+      queue.shift()(queue.shift(), queue.shift())
+    queued = false
     return
 
   MutationObserver = root.MutationObserver or root.WebKitMutationObserver
@@ -47,13 +41,11 @@ define 'µ', (µ, root) ->
       setTimeout tick, 0
       return
 
-  µ.schedule = (callback) ->
-    if useA
-      if queueA.push(callback) is 1
-        scheduleTick()
-    else
-      if queueB.push(callback) is 1
-        scheduleTick()
+  _.schedule = (callback, arg1, arg2) ->
+    queue.push callback, arg1, arg2
+    if not queued
+      queued = true
+      scheduleTick()
     return
 
   return
