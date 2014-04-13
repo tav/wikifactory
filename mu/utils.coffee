@@ -3,7 +3,8 @@
 
 define 'µ', (µ, root) ->
 
-  {keys, now} = µ._
+  {keys} = µ._
+  {now} = µ
 
   µ.is = (obj, ctor) ->
     obj instanceof ctor._typ
