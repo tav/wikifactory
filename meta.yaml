@@ -1,14 +1,11 @@
 # Public Domain (-) 2014 The Wikifactory Authors.
 # See the Wikifactory UNLICENSE file for details.
 
-dist-checksum:
-dist-version:
+gae-version: 1.9.3
+gae-version-name: 1.9.3
 
-gae-version: 1.9.0
-gae-version-name: 1.9.0
-
-go-darwin-sdk: 0e660230e4cfaac1b9dacff993d5128ef84c0fb9
-go-linux-sdk: 576026cc16f0ec67b33afcbe2b7b234bd4c61693
-go-windows-sdk: 26e0751e222c23c05340b57a19ee85247c9cf55a
-java-sdk: 45fac6746c65641eeaf087c88bc755365c69ef71
-python-sdk: 923a7f99e058d93408d3940e0307bdf2769b7480
+go-darwin-sdk: 8d77270b73c1d4892cb54d9e6ff3b592f4f35970
+go-linux-sdk: be09835d79ad5985b2d491b4e2b5c4bd2d04df28
+go-windows-sdk: 507074becb5de06d0d338563d77c4e5319484c6f
+java-sdk: 4f62f99c7be21637903b312ba4431c6222bfca16
+python-sdk: 4d4a535604a05bda3972c1abff6289f9b2ed9bfd
