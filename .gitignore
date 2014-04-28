@@ -9,12 +9,16 @@ app/build
 app/config/pregen.go
 app/pregen/pregen.go
 backend/config/pregen.go
+coffee/*.html
+coffee/*.js
 genlogo/logo/fonts.go
 instance
 java/war
 live-server/live-server
 live-server/log
 live-server/run
+mu/*.html
+mu/*.js
 
 # hidden files/directories
 
