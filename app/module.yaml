@@ -1,7 +1,22 @@
 module: default
 version: 1
-runtime: go
-api_version: go1
+runtime: python27
+api_version: 1
+threadsafe: true
+
+libraries:
+
+- name: lxml
+  version: latest
+
+- name: markupsafe
+  version: latest
+
+- name: numpy
+  version: latest
+
+- name: webob
+  version: latest
 
 handlers:
 
@@ -10,34 +25,76 @@ handlers:
   upload: static/favicon.ico
   # expiration: 1d
 
-- url: /robots.txt
-  static_files: static/robots.txt
-  upload: static/robots.txt
-  # expiration: 1d
-
 - url: /humans.txt
   static_files: static/humans.txt
   upload: static/humans.txt
   # expiration: 1d
 
-- url: /apple-touch-icon-152x152.png
-  static_files: static/apple-touch-icon-152x152.png
-  upload: static/apple-touch-icon-152x152.png
-  # expiration: 1d
-
-- url: /apple-touch-icon-120x120.png
-  static_files: static/apple-touch-icon-120x120.png
-  upload: static/apple-touch-icon-120x120.png
-  # expiration: 1d
-
-- url: /apple-touch-icon-76x76.png
-  static_files: static/apple-touch-icon-76x76.png
-  upload: static/apple-touch-icon-76x76.png
+- url: /robots.txt
+  static_files: static/robots.txt
+  upload: static/robots.txt
   # expiration: 1d
 
 - url: /static
   static_dir: build
   # expiration: 7d
 
-- url: /.*
-  script: _go_app
+# iOS 7 sizes from http://taylor.fausak.me/2013/11/01/ios-7-web-apps/
+# Related gist: https://gist.github.com/tfausak/2222823
+
+# iPad 2 & iPad Mini | Non-Retina | iOS 7
+- url: /apple-touch-icon-76x76.png
+  static_files: static/apple-touch-icon-76x76.png
+  upload: static/apple-touch-icon-76x76.png
+  # expiration: 1d
+
+# iPhone & iPod Touch | Retina | iOS 7
+- url: /apple-touch-icon-120x120.png
+  static_files: static/apple-touch-icon-120x120.png
+  upload: static/apple-touch-icon-120x120.png
+  # expiration: 1d
+
+# iPad & iPad Mini | Retina | iOS 7
+- url: /apple-touch-icon-152x152.png
+  static_files: static/apple-touch-icon-152x152.png
+  upload: static/apple-touch-icon-152x152.png
+  # expiration: 1d
+
+# iPhone 5 | iOS 7
+- url: /startup-640x1096.png
+  static_files: static/startup-640x1096.png
+  upload: static/startup-640x1096.png
+  # expiration: 1d
+
+# iPhone 5S/5C | iOS 7
+- url: /startup-640x1136.png
+  static_files: static/startup-640x1136.png
+  upload: static/startup-640x1136.png
+  # expiration: 1d
+
+# iPad | Non-Retina | iOS 7 | Portrait
+- url: /startup-768x1004.png
+  static_files: static/startup-768x1004.png
+  upload: static/startup-768x1004.png
+  # expiration: 1d
+
+# iPad | Non-Retina | iOS 7 | Landscape
+- url: /startup-748x1024.png
+  static_files: static/startup-748x1024.png
+  upload: static/startup-748x1024.png
+  # expiration: 1d
+
+# iPad | Retina | iOS 7 | Portrait
+- url: /startup-1536x2008.png
+  static_files: static/startup-1536x2008.png
+  upload: static/startup-1536x2008.png
+  # expiration: 1d
+
+# iPad | Retina | iOS 7 | Landscape
+- url: /startup-1496x2048.png
+  static_files: static/startup-1496x2048.png
+  upload: static/startup-1496x2048.png
+  # expiration: 1d
+
+- url: .*
+  script: main.app
